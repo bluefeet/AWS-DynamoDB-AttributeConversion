@@ -1,0 +1,88 @@
+=pod
+
+=head1 NAME
+
+AWS::DynamoDB::AttributeConversion - Adjust Perl data structures to be
+compatible with AWS' DynamoDB API.
+
+=head1 SYNOPSIS
+
+    use AWS::DynamoDB::AttributeConversion;
+    
+    my $ready_for_aws = freeze( {this=>123} );
+    # { M => { this => {N => '123'} } }
+
+=head1 DESCRIPTION
+
+Storing complex data structures in DynamoDB can be a pain.  This module makes
+it easy to convert plain scalars, arrays, and hashes into the structure
+that is needed to store your data in DynamoDB.  This way you can use DynamoDB's
+ability to retrieve and filter data sets based on these structures.
+
+This module is primarly targetted at being used with L<Paws::DynamoDB>, but is in
+no way written as to be tied to L<Paws>.
+
+Some more information can be found at
+L<http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_AttributeValue.html>.
+
+=head1 DATA TYPES
+
+Perl does not have native data types for all the data types which DynamoDB
+supports.  Due to this some "dumbing down" of the data types happen when
+they are thawed.  For example, these:
+
+    { B=>'a' },
+    { BS=>['a','b','c'] },
+    { BOOL=>1 },
+    { SS=>['a','b','c'] },
+
+all thaw to:
+
+    'a',
+    ['a', 'b', 'c'],
+    1,
+    ['a', 'b', 'c'],
+
+and will freeze back to:
+
+    { S=>'a' },
+    { L=>['a','b','c'] },
+    { N=>1 },
+    { L=>['a','b','c'] },
+
+A future update may include the option to enable native handling of these
+types, such as using L<boolean> for C<BOOL> types.
+
+=head1 EXPORTED
+
+=head2 freeze_attribute
+
+    my $aws_data = freeze_attribute( $plain_data );
+
+Takes a plain scalar, hashref, or arrayref, and returns a new data
+structure marked up and ready to be sent to AWS (usually to C<PutItem>).
+
+=head2 thaw_attribute
+
+    my $plain_data = thaw_attribute( $aws_data );
+
+Takes a marked up AWS data structure (most often this will be the C<Item>
+returned by C<GetItem>) and returns a plain scalar, hashref, or arrayref.
+
+=head1 AUTHOR
+
+Aran Clary Deltac <bluefeetE<64>gmail.com>
+
+=head1 ACKNOWLEDGEMENTS
+
+Thanks to L<ZipRecruiter|https://www.ziprecruiter.com/>
+for encouraging their employees to contribute back to the open
+source ecosystem.  Without their dedication to quality software
+development this distribution would not exist.
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
