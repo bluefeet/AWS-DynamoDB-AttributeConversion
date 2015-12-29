@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use Test::Stream '-V1', 'Subtest';
 
-use AWS::DynamoDB::AttributeConversion;
+use AWS::DynamoDB::ItemTransformer;
 
 # Each test is an array ref with three pieces:
 # 1. What the data looks like when thawed.
@@ -60,19 +60,19 @@ my @tests = (
 );
 
 
-subtest freeze => sub{
+subtest encode => sub{
     foreach my $test (@tests) {
-        my ($thawed, $frozen, $title) = @$test;
+        my ($decoded, $encoded, $title) = @$test;
 
         is(
-            freeze_attribute( $thawed ),
-            $frozen,
+            encode_ddb_value( $decoded ),
+            $encoded,
             $title,
         );
     }
 };
 
-my @thaw_tests = (
+my @decode_tests = (
     @tests,
     [
         'A',
@@ -101,13 +101,13 @@ my @thaw_tests = (
     ],
 );
 
-subtest thaw => sub{
-    foreach my $test (@thaw_tests) {
-        my ($thawed, $frozen, $title) = @$test;
+subtest decode => sub{
+    foreach my $test (@decode_tests) {
+        my ($decoded, $encoded, $title) = @$test;
 
         is(
-            thaw_attribute( $frozen ),
-            $thawed,
+            decode_ddb_value( $encoded ),
+            $decoded,
             $title,
         );
     }

@@ -1,4 +1,4 @@
-=pod
+package AWS::DynamoDB::ItemTransformer;
 
 =head1 NAME
 
@@ -86,6 +86,26 @@ Alternatively you can use various plugins to alter this behavior, such
 as L<AWS::DynamoDB::ItemTransformer::boolean> which adds support for
 encoding and decoding L<boolean> objects as the C<BOOL> data type.
 
+=cut
+
+use B;
+use Carp qw( croak );
+
+use Moo;
+use strictures 2;
+use namespace::clean;
+
+use Exporter qw( import );
+
+our @EXPORT = qw(
+    encode_ddb_item
+    decode_ddb_item
+    encode_ddb_value
+    decode_ddb_value
+);
+
+my $default_object = __PACKAGE__->new();
+
 =head1 EXPORTED
 
 =head2 encode_ddb_item
@@ -123,23 +143,126 @@ C<PutItem> API).
 Takes an AWS attribute value hash ref and returns the equivalent
 Perl data structure.
 
+=cut
+
+sub encode_ddb_item { $default_object->encode_item( @_ ) }
+sub decode_ddb_item { $default_object->decode_item( @_ ) }
+
+sub encode_ddb_value { $default_object->encode_value( @_ ) }
+sub decode_ddb_value { $default_object->decode_value( @_ ) }
+
 =head1 METHODS
 
 =head2 encode_item
 
 This is the OO equivalent of L</encode_ddb_item>.
 
+=cut
+
+sub encode_item {
+    my ($self, %item) = @_;
+
+    return(
+        map { $_ => $self->encode_value( $item{$_} ) }
+        keys( %item )
+    );
+}
+
 =head2 decode_item
 
 This is the OO equivalent of L</decode_ddb_item>.
+
+=cut
+
+sub decode_item {
+    my ($self, %ddb_item) = @_;
+
+    return(
+        map { $_ => $self->decode_value( $ddb_item{$_} ) }
+        keys( %ddb_item )
+    );
+}
 
 =head2 encode_value
 
 This is the OO equivalent of L</encode_ddb_value>.
 
+=cut
+
+sub encode_value {
+    my ($self, $value) = @_;
+
+    if (!defined $value) {
+        return { NULL => 1 };
+    }
+
+    my $ref = ref $value;
+
+    if ($ref eq 'HASH') {
+        return { M => {
+        map {
+            $_ => $self->encode_value($value->{$_})
+        }
+        keys( %$value )
+        }};
+    }
+    elsif ($ref eq 'ARRAY') {
+        return { L => [
+        map { $self->encode_value($_) }
+        @$value
+        ]};
+    }
+    elsif (!$ref) {
+        my $type = $self->is_numeric( $value ) ? 'N' : 'S';
+        return { $type => "$value" };
+    }
+
+    local $Carp::Internal{ (__PACKAGE__) } = 1;
+    croak "A $ref may not be encoded as a DynamoDB attribure value";
+}
+
 =head2 decode_value
 
 This is the OO equivalent of L</decode_ddb_value>.
+
+=cut
+
+sub decode_value {
+  my ($self, $ddb_value) = @_;
+
+  my ($type) = keys(%$ddb_value);
+  my $value = $ddb_value->{$type};
+
+  return $value if
+    $type eq 'B' or
+    $type eq 'BS' or
+    $type eq 'S' or
+    $type eq 'SS';
+
+  return !!$value if $type eq 'BOOL';
+
+  return [
+    map { $self->decode_value($_) }
+    @$value
+  ] if $type eq 'L';
+
+  return {
+    map { $_ => $self->decode_value($value->{$_}) }
+    keys( %$value )
+  } if $type eq 'M';
+
+  return $value+0 if $type eq 'N';
+
+  return [
+    map { $_+0 }
+    @$value
+  ] if $type eq 'NS';
+
+  return undef if $type eq 'NULL';
+
+  local $Carp::Internal{ (__PACKAGE__) } = 1;
+  croak "The $type DynamoDB attribute value type is unsupported by " . __PACKAGE__;
+}
 
 =head2 is_numeric
 
@@ -148,6 +271,21 @@ is numeric is determined by looking at the SV flags for the scalar.
 
 This is used by L</encode_value> to determine if a non-ref value is
 a string (S) or number (N).
+
+=cut
+
+# stolen from JSON::PP
+sub is_numeric {
+   my ($self, $scalar) = @_;
+   my $b_obj = B::svref_2object(\$scalar);
+   my $flags = $b_obj->FLAGS;
+   return (( $flags & B::SVf_IOK or $flags & B::SVp_IOK
+          or $flags & B::SVf_NOK or $flags & B::SVp_NOK
+        ) and !($flags & B::SVf_POK ))
+}
+
+1;
+__END__
 
 =head1 AUTHOR
 
@@ -166,3 +304,4 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
+
