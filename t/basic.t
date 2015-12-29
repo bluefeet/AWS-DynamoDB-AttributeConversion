@@ -60,7 +60,7 @@ my @tests = (
 );
 
 
-subtest encode => sub{
+subtest encode_value => sub{
     foreach my $test (@tests) {
         my ($decoded, $encoded, $title) = @$test;
 
@@ -101,7 +101,7 @@ my @decode_tests = (
     ],
 );
 
-subtest decode => sub{
+subtest decode_value => sub{
     foreach my $test (@decode_tests) {
         my ($decoded, $encoded, $title) = @$test;
 
@@ -112,5 +112,17 @@ subtest decode => sub{
         );
     }
 };
+
+is(
+    { encode_ddb_item( foo => 32 ) },
+    { foo => { N => '32' } },
+    'encode_item',
+);
+
+is(
+    { decode_ddb_item( foo => { N => 32 } ) },
+    { foo => 32 },
+    'decode_item',
+);
 
 done_testing;
